@@ -5,8 +5,9 @@ import streamlit as st
 st.title("Dynamic Rent Analysis")
 
 # Load Data from Excel File
-file_path = r"C:\Users\Admin\OneDrive\allRentalData.xlsx"
-data = pd.read_excel(file_path)
+file_url = r"https://docs.google.com/uc?id=1dx5slnckpqhmPgyH8rSpXF9yHEiYJV0X&export=download"
+
+data = pd.read_excel(file_url, engine="openpyxl")
 
 # Clean up data (drop rows with missing values for critical columns)
 data = data.dropna(subset=["General Area", "Neighbourhood", "Bedrooms", "Bathrooms", "Monthly Rent"])
