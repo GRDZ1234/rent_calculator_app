@@ -3,7 +3,7 @@ import streamlit as st
 
 st.title("Mortgage Calculator")
 
-# File Path or Direct Link
+# File Path or Direct Link to Google Sheets
 file_path = "https://docs.google.com/uc?id=1dx5slnckpqhmPgyH8rSpXF9yHEiYJV0X&export=download"
 
 # Load Data
@@ -49,6 +49,10 @@ for bedrooms, bathrooms in unit_details:
         unit_data = filtered_data[(filtered_data["Bedrooms"] == bedrooms)]
     filtered_rent_data.append(unit_data)
 
+# Calculate Total Monthly Rent
+total_monthly_rent = sum(unit["Monthly Rent"].mean() for unit in filtered_rent_data if not unit.empty)
+st.write(f"## Total Monthly Rent: ${int(total_monthly_rent):,}")
+
 # Display Unit Statistics
 st.write("## Unit Statistics")
 for idx in range(0, len(filtered_rent_data), 3):
@@ -56,24 +60,14 @@ for idx in range(0, len(filtered_rent_data), 3):
     for col, unit_data in zip(unit_columns, filtered_rent_data[idx:idx + 3]):
         col.write(f"### Statistics for Unit {idx + 1}")
         if not unit_data.empty:
-            grouped_stats = unit_data.groupby(["Bedrooms", "Bathrooms"]).agg(
-                AverageRent=("Monthly Rent", "mean"),
-                MedianRent=("Monthly Rent", "median"),
-                Count=("Monthly Rent", "count")
-            ).reset_index()
+            avg_rent = unit_data["Monthly Rent"].mean()
+            med_rent = unit_data["Monthly Rent"].median()
+            rent_count = len(unit_data)
 
-            # Extract values for display
-            if not grouped_stats.empty:
-                avg_rent = grouped_stats["AverageRent"].iloc[0]
-                med_rent = grouped_stats["MedianRent"].iloc[0]
-                rent_count = grouped_stats["Count"].iloc[0]
-
-                # Format the results
-                col.write(f"**Average Rent:** ${int(avg_rent):,}")
-                col.write(f"**Median Rent:** ${int(med_rent):,}")
-                col.write(f"**Count:** {int(rent_count)}")
-            else:
-                col.write("No data available.")
+            # Format and Display Statistics
+            col.write(f"**Average Rent:** ${int(avg_rent):,}")
+            col.write(f"**Median Rent:** ${int(med_rent):,}")
+            col.write(f"**Count:** {rent_count}")
         else:
             col.write("No data available.")
 
@@ -99,7 +93,7 @@ terms = [20, 25, 30]  # Years for mortgage
 down_payments = [20, 25, 30, 35, 40, 45, 50]  # Percentage
 
 if filtered_rent_data:
-    total_rent = sum(unit["Monthly Rent"].mean() for unit in filtered_rent_data if not unit.empty) * 12
+    total_rent = total_monthly_rent * 12
     net_income = total_rent - total_expenses
 
     st.write(f"### Total Annual Rent: ${int(total_rent):,}")
@@ -110,13 +104,29 @@ if filtered_rent_data:
         cols = st.columns(3)
         for idx, down_payment in enumerate(down_payments):
             with cols[idx % 3]:
-                max_mortgage = net_income / ((interest_rate / 100) / 12 * (1 + (1 + interest_rate / 100) ** -(term * 12)))
-                required_down = max_mortgage * (down_payment / 100)
-                self_funded = max_mortgage + required_down
+                if net_income > 0:
+                    # Monthly mortgage payment formula
+                    monthly_interest_rate = (interest_rate / 100) / 12
+                    num_payments = term * 12
+                    max_monthly_payment = net_income / 12
 
-                st.write(f"#### {down_payment}% Down Payment")
-                st.write(f"Maximum Mortgage: ${int(max_mortgage):,}")
-                st.write(f"Required Down Payment: ${int(required_down):,}")
-                st.write(f"Total Purchase Value: ${int(self_funded):,}")
+                    max_mortgage = (
+                        max_monthly_payment
+                        * (1 - (1 + monthly_interest_rate) ** -num_payments)
+                        / monthly_interest_rate
+                    )
+                    required_down = max_mortgage * (down_payment / 100)
+                    total_value = max_mortgage + required_down
+                    yearly_mortgage_payment = max_monthly_payment * 12
+
+                    # Display Results
+                    st.write(f"#### {down_payment}% Down Payment")
+                    st.write(f"Maximum Mortgage: ${int(max_mortgage):,}")
+                    st.write(f"Required Down Payment: ${int(required_down):,}")
+                    st.write(f"Total Purchase Value: ${int(total_value):,}")
+                    st.write(f"Yearly Mortgage Payment: ${int(yearly_mortgage_payment):,}")
+                else:
+                    st.write(f"#### {down_payment}% Down Payment")
+                    st.write("Insufficient net income for mortgage.")
 else:
     st.warning("No valid data to calculate mortgage.")
